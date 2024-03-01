@@ -9,7 +9,7 @@ use crate::connection::{ConnectionAddr, ConnectionInfo, Msg, RedisConnectionInfo
 #[cfg(any(feature = "tokio-comp", feature = "async-std-comp"))]
 use crate::parser::ValueCodec;
 use crate::types::{ErrorKind, FromRedisValue, RedisError, RedisFuture, RedisResult, Value};
-use crate::{from_owned_redis_value, ToRedisArgs};
+use crate::{from_owned_redis_value, Pipeline, ToRedisArgs};
 #[cfg(all(not(feature = "tokio-comp"), feature = "async-std-comp"))]
 use ::async_std::net::ToSocketAddrs;
 use ::tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
@@ -65,6 +65,70 @@ impl<C> Connection<C> {
             pubsub,
         }
     }
+
+    /// Split connection to reader and writer
+    pub fn split<R, W>(self, f: impl FnOnce(C) -> (R, W)) -> (Connection<R>, Connection<W>) {
+        let Self {
+            con,
+            buf,
+            decoder,
+            db,
+            pubsub,
+        } = self;
+        let (r, w) = f(con);
+        (
+            Connection {
+                con: r,
+                buf: Vec::new(),
+                decoder: Default::default(),
+                db,
+                pubsub,
+            },
+            Connection {
+                con: w,
+                buf,
+                decoder,
+                db,
+                pubsub,
+            },
+        )
+    }
+
+    /// into raw connection
+    pub fn into_inner(self) -> C {
+        self.con
+    }
+}
+
+impl<C> Connection<C>
+where
+    C: Unpin + AsyncRead + Send,
+{
+    /// Fetches a single response from the connection.
+    pub async fn read_response(&mut self) -> RedisResult<Value> {
+        crate::parser::parse_redis_value_async(&mut self.decoder, &mut self.con).await
+    }
+}
+
+impl<C> Connection<C>
+where
+    C: Unpin + AsyncWrite + Send,
+{
+    /// Sends a single command to the server.
+    pub async fn submit_packed_command(&mut self, cmd: &Cmd) -> RedisResult<()> {
+        self.buf.clear();
+        cmd.write_packed_command(&mut self.buf);
+        self.con.write_all(&self.buf).await?;
+        Ok(())
+    }
+
+    /// Sends a single command to the server.
+    pub async fn submit_packed_commands(&mut self, pipe: &Pipeline) -> RedisResult<()> {
+        self.buf.clear();
+        pipe.write_packed_pipeline(&mut self.buf);
+        self.con.write_all(&self.buf).await?;
+        Ok(())
+    }
 }
 
 impl<C> Connection<C>
@@ -93,11 +157,6 @@ where
     /// Converts this [`Connection`] into [`Monitor`]
     pub fn into_monitor(self) -> Monitor<C> {
         Monitor::new(self)
-    }
-
-    /// Fetches a single response from the connection.
-    async fn read_response(&mut self) -> RedisResult<Value> {
-        crate::parser::parse_redis_value_async(&mut self.decoder, &mut self.con).await
     }
 
     /// Brings [`Connection`] out of `PubSub` mode.
