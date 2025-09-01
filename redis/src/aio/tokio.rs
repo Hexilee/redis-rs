@@ -43,7 +43,7 @@ async fn connect_tcp(
     TcpStreamTokio::from_std(std_socket)
 }
 
-pub(crate) enum Tokio {
+pub enum Tokio {
     /// Represents a Tokio TCP connection.
     Tcp(TcpStreamTokio),
     /// Represents a Tokio TLS encrypted TCP connection

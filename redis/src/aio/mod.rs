@@ -107,8 +107,8 @@ async fn execute_connection_pipeline(
     check_connection_setup(results, instructions)
 }
 
-// Initial setup for every connection.
-async fn setup_connection(
+/// Initial setup for every connection.
+pub async fn setup_connection(
     connection_info: &RedisConnectionInfo,
     con: &mut impl ConnectionLike,
     #[cfg(feature = "cache-aio")] cache_config: Option<crate::caching::CacheConfig>,
@@ -234,7 +234,7 @@ where
 
 /// Default DNS resolver which uses the system's DNS resolver.
 #[derive(Clone)]
-pub(crate) struct DefaultAsyncDNSResolver;
+pub struct DefaultAsyncDNSResolver;
 
 impl AsyncDNSResolver for DefaultAsyncDNSResolver {
     fn resolve<'a, 'b: 'a>(

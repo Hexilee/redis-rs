@@ -73,7 +73,7 @@ impl Pipeline {
     }
 
     #[cfg(feature = "aio")]
-    pub(crate) fn is_transaction(&self) -> bool {
+    pub fn is_transaction(&self) -> bool {
         self.transaction_mode
     }
 

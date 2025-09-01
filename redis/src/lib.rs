@@ -544,6 +544,13 @@ pub use crate::connection::{
 pub use crate::parser::{parse_redis_value, Parser};
 pub use crate::pipeline::Pipeline;
 
+// Exported for Hugestream2.
+#[cfg(all(feature = "aio", feature = "tokio-comp"))]
+pub use crate::aio::{
+    setup_connection as setup_aio_connection, tokio::Tokio, DefaultAsyncDNSResolver,
+};
+pub use crate::parser::ValueCodec;
+
 #[cfg(feature = "script")]
 #[cfg_attr(docsrs, doc(cfg(feature = "script")))]
 pub use crate::script::{Script, ScriptInvocation};

@@ -176,13 +176,13 @@ pub(crate) enum Cache {
 #[derive(Clone, Default)]
 pub struct AsyncConnectionConfig {
     /// Maximum time to wait for a response from the server
-    pub(crate) response_timeout: Option<std::time::Duration>,
+    pub response_timeout: Option<std::time::Duration>,
     /// Maximum time to wait for a connection to be established
-    pub(crate) connection_timeout: Option<std::time::Duration>,
+    pub connection_timeout: Option<std::time::Duration>,
     pub(crate) push_sender: Option<std::sync::Arc<dyn AsyncPushSender>>,
     #[cfg(feature = "cache-aio")]
     pub(crate) cache: Option<Cache>,
-    pub(crate) tcp_settings: TcpSettings,
+    pub tcp_settings: TcpSettings,
     pub(crate) dns_resolver: Option<std::sync::Arc<dyn AsyncDNSResolver>>,
 }
 
@@ -871,7 +871,7 @@ impl Client {
         }
     }
 
-    async fn get_simple_async_connection<T>(
+    pub async fn get_simple_async_connection<T>(
         &self,
         dns_resolver: &dyn AsyncDNSResolver,
         tcp_settings: &TcpSettings,
