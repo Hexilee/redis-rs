@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 #[cfg(feature = "aio")]
-use crate::aio::{AsyncPushSender, DefaultAsyncDNSResolver};
+use crate::aio::{AsyncPushSender, DefaultAsyncDNSResolver, RedisRuntime};
 #[cfg(feature = "aio")]
 use crate::io::{tcp::TcpSettings, AsyncDNSResolver};
 use crate::{
@@ -839,7 +839,7 @@ impl Client {
             .await?;
         crate::aio::MultiplexedConnection::new_with_config(
             &self.connection_info.redis,
-            con,
+            con.boxed(),
             config.clone(),
         )
         .await
@@ -852,22 +852,19 @@ impl Client {
     ) -> RedisResult<Pin<Box<dyn crate::aio::AsyncStream + Send + Sync>>> {
         match Runtime::locate() {
             #[cfg(feature = "tokio-comp")]
-            Runtime::Tokio => {
-                self.get_simple_async_connection::<crate::aio::tokio::Tokio>(
-                    dns_resolver,
-                    tcp_settings,
-                )
+            Runtime::Tokio => self
+                .get_simple_async_connection::<crate::aio::tokio::Tokio>(dns_resolver, tcp_settings)
                 .await
-            }
+                .map(RedisRuntime::boxed),
 
             #[cfg(feature = "async-std-comp")]
-            Runtime::AsyncStd => {
-                self.get_simple_async_connection::<crate::aio::async_std::AsyncStd>(
+            Runtime::AsyncStd => self
+                .get_simple_async_connection::<crate::aio::async_std::AsyncStd>(
                     dns_resolver,
                     tcp_settings,
                 )
                 .await
-            }
+                .map(RedisRuntime::boxed),
         }
     }
 
@@ -875,15 +872,11 @@ impl Client {
         &self,
         dns_resolver: &dyn AsyncDNSResolver,
         tcp_settings: &TcpSettings,
-    ) -> RedisResult<Pin<Box<dyn crate::aio::AsyncStream + Send + Sync>>>
+    ) -> RedisResult<T>
     where
         T: crate::aio::RedisRuntime,
     {
-        Ok(
-            crate::aio::connect_simple::<T>(&self.connection_info, dns_resolver, tcp_settings)
-                .await?
-                .boxed(),
-        )
+        crate::aio::connect_simple::<T>(&self.connection_info, dns_resolver, tcp_settings).await
     }
 
     #[cfg(feature = "connection-manager")]
